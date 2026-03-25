@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: fibonacci-agent
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fibonacci-agent-config
+  namespace: fibonacci-agent
+data:
+  AGENT_MODEL: "gpt-4"
+  AGENT_PROVIDER: "langchain"
+  SANDBOX_RUNTIME: "gvisor"
+  EXECUTION_TIMEOUT: "30"
+  MAX_MEMORY: "128Mi"
+  MAX_CPU: "500m"
+  CODE_OUTPUT_DIR: "/tmp/generated"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: generated-code-pvc
+  namespace: fibonacci-agent
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Mi 
+  storageClassName: standard

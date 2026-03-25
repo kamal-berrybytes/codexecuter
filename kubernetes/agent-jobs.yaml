@@ -1,0 +1,204 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: fibonacci-code-generator
+  namespace: fibonacci-agent
+spec:
+  template:
+    metadata:
+      labels:
+        app: fibonacci-agent
+        step: code-generation
+    spec:
+      restartPolicy: OnFailure
+      runtimeClassName: gvisor
+      containers:
+        - name: generator
+          image: fibonacci-agent:latest
+          imagePullPolicy: Never
+          command: ["python", "/app/agent/langchain_agent.py"]
+          env:
+            - name: KUBERNETES_MODE
+              value: "true"
+            - name: CODE_OUTPUT_DIR
+              value: "/tmp/generated"
+          resources:
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+          volumeMounts:
+            - name: generated-code
+              mountPath: /tmp/generated
+      volumes:
+        - name: generated-code
+          persistentVolumeClaim:
+            claimName: generated-code-pvc
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: fibonacci-security-analyzer
+  namespace: fibonacci-agent
+spec:
+  template:
+    metadata:
+      labels:
+        app: fibonacci-agent
+        step: security-analysis
+    spec:
+      restartPolicy: OnFailure
+      runtimeClassName: gvisor
+      containers:
+        - name: analyzer
+          image: fibonacci-agent:latest
+          imagePullPolicy: Never
+          command: ["python", "/app/security/security_analyzer.py"]
+          env:
+            - name: KUBERNETES_MODE
+              value: "true"
+            - name: CODE_OUTPUT_DIR
+              value: "/tmp/generated"
+          resources:
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+          volumeMounts:
+            - name: generated-code
+              mountPath: /tmp/generated
+      volumes:
+        - name: generated-code
+          persistentVolumeClaim:
+            claimName: generated-code-pvc
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: fibonacci-sandbox-executor
+  namespace: fibonacci-agent
+spec:
+  template:
+    metadata:
+      labels:
+        app: fibonacci-agent
+        step: sandbox-execution
+    spec:
+      restartPolicy: OnFailure
+      runtimeClassName: gvisor
+      containers:
+        - name: executor
+          image: fibonacci-agent:latest
+          imagePullPolicy: Never
+          command: ["python", "/app/sandbox/gvisor_executor.py"]
+          env:
+            - name: KUBERNETES_MODE
+              value: "true"
+            - name: CODE_OUTPUT_DIR
+              value: "/tmp/generated"
+            - name: RUNTIME_CLASS
+              value: "gvisor"
+            - name: EXECUTION_TIMEOUT
+              value: "30"
+            - name: MAX_MEMORY
+              value: "128Mi"
+            - name: MAX_CPU
+              value: "500m"
+          resources:
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+          volumeMounts:
+            - name: generated-code
+              mountPath: /tmp/generated
+      volumes:
+        - name: generated-code
+          persistentVolumeClaim:
+            claimName: generated-code-pvc
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: fibonacci-code-evaluator
+  namespace: fibonacci-agent
+spec:
+  template:
+    metadata:
+      labels:
+        app: fibonacci-agent
+        step: code-evaluation
+    spec:
+      restartPolicy: OnFailure
+      runtimeClassName: gvisor
+      containers:
+        - name: evaluator
+          image: fibonacci-agent:latest
+          imagePullPolicy: Never
+          command: ["python", "/app/evaluation/evaluator.py"]
+          env:
+            - name: KUBERNETES_MODE
+              value: "true"
+            - name: CODE_OUTPUT_DIR
+              value: "/tmp/generated"
+            - name: EXECUTION_TIMEOUT
+              value: "30"
+          resources:
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+          volumeMounts:
+            - name: generated-code
+              mountPath: /tmp/generated
+      volumes:
+        - name: generated-code
+          persistentVolumeClaim:
+            claimName: generated-code-pvc
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: fibonacci-second-agent
+  namespace: fibonacci-agent
+spec:
+  template:
+    metadata:
+      labels:
+        app: fibonacci-agent
+        step: second-agent
+    spec:
+      restartPolicy: OnFailure
+      runtimeClassName: gvisor
+      containers:
+        - name: second-agent
+          image: fibonacci-agent:latest
+          imagePullPolicy: Never
+          command: ["python", "/app/agent/second_agent.py"]
+          env:
+            - name: KUBERNETES_MODE
+              value: "true"
+            - name: CODE_OUTPUT_DIR
+              value: "/tmp/generated"
+          resources:
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+          volumeMounts:
+            - name: generated-code
+              mountPath: /tmp/generated
+      volumes:
+        - name: generated-code
+          persistentVolumeClaim:
+            claimName: generated-code-pvc

@@ -1,0 +1,61 @@
+---
+# Kubernetes API Server Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: code-executor-api
+  namespace: fibonacci-agent
+  labels:
+    app: code-executor-api
+    component: api
+spec:
+  selector:
+    app: code-executor-api
+  ports:
+    - port: 5000
+      targetPort: 5000
+      protocol: TCP
+  type: NodePort
+---
+# Kubernetes API Server Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: code-executor-api
+  namespace: fibonacci-agent
+  labels:
+    app: code-executor-api
+    component: api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: code-executor-api
+  template:
+    metadata:
+      labels:
+        app: code-executor-api
+        component: api
+    spec:
+      # Use Gvisor runtime for isolation
+      serviceAccountName: fibonacci-agent-sa
+      containers:
+        - name: api
+          image: fibonacci-agent:latest
+          imagePullPolicy: Never
+          command: ["python", "/app/api_server.py"]
+          ports:
+            - containerPort: 5000
+              protocol: TCP
+          env:
+            - name: KUBERNETES_MODE
+              value: "true"
+            - name: CODE_OUTPUT_DIR
+              value: "/tmp/code"
+          volumeMounts:
+            - name: code-volume
+              mountPath: /tmp/code
+      volumes:
+        - name: code-volume
+          persistentVolumeClaim:
+            claimName: generated-code-pvc

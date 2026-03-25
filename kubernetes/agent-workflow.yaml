@@ -1,0 +1,194 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  name: fibonacci-agent-workflow
+  namespace: fibonacci-agent
+spec:
+  entrypoint: fibonacci-pipeline
+  serviceAccountName: fibonacci-agent-sa
+  templates:
+    - name: fibonacci-pipeline
+      dag:
+        tasks:
+          - name: generate-code
+            template: code-generator
+            artifacts:
+              - name: generated-code
+                path: /tmp/generated
+            
+          - name: security-analysis
+            template: security-analyzer
+            dependencies: [generate-code]
+            artifacts:
+              - name: generated-code
+                from: generate-code.generated-code
+                
+          - name: sandbox-execution
+            template: sandbox-executor
+            dependencies: [security-analysis]
+            artifacts:
+              - name: generated-code
+                from: security-analysis.generated-code
+                
+          - name: evaluate-code
+            template: code-evaluator
+            dependencies: [sandbox-execution]
+            artifacts:
+              - name: generated-code
+                from: sandbox-execution.generated-code
+                
+          - name: second-agent
+            template: second-agent
+            dependencies: [evaluate-code]
+            artifacts:
+              - name: generated-code
+                from: evaluate-code.generated-code
+
+    - name: code-generator
+      container:
+        image: fibonacci-agent:latest
+        command: [python, /app/agent/langchain_agent.py]
+        env:
+          - name: KUBERNETES_MODE
+            value: "true"
+          - name: CODE_OUTPUT_DIR
+            value: "/tmp/generated"
+        resources:
+          limits:
+            memory: 256Mi
+            cpu: 500m
+          requests:
+            memory: 128Mi
+            cpu: 100m
+        volumeMounts:
+          - name: generated-code
+            mountPath: /tmp/generated
+      outputs:
+        artifacts:
+          - name: generated-code
+            path: /tmp/generated
+            archive:
+              log: {}
+      volumes:
+        - name: generated-code
+          emptyDir: {}
+
+    - name: security-analyzer
+      container:
+        image: fibonacci-agent:latest
+        command: [python, /app/security/security_analyzer.py]
+        env:
+          - name: KUBERNETES_MODE
+            value: "true"
+          - name: CODE_OUTPUT_DIR
+            value: "/tmp/generated"
+        resources:
+          limits:
+            memory: 256Mi
+            cpu: 500m
+          requests:
+            memory: 128Mi
+            cpu: 100m
+        volumeMounts:
+          - name: generated-code
+            mountPath: /tmp/generated
+      outputs:
+        artifacts:
+          - name: generated-code
+            path: /tmp/generated
+            archive:
+              log: {}
+      volumes:
+        - name: generated-code
+          emptyDir: {}
+
+    - name: sandbox-executor
+      container:
+        image: fibonacci-agent:latest
+        command: [python, /app/sandbox/gvisor_executor.py]
+        env:
+          - name: KUBERNETES_MODE
+            value: "true"
+          - name: CODE_OUTPUT_DIR
+            value: "/tmp/generated"
+          - name: RUNTIME_CLASS
+            value: "gvisor"
+          - name: EXECUTION_TIMEOUT
+            value: "30"
+          - name: MAX_MEMORY
+            value: "128Mi"
+          - name: MAX_CPU
+            value: "500m"
+        resources:
+          limits:
+            memory: 256Mi
+            cpu: 500m
+          requests:
+            memory: 128Mi
+            cpu: 100m
+        volumeMounts:
+          - name: generated-code
+            mountPath: /tmp/generated
+      outputs:
+        artifacts:
+          - name: generated-code
+            path: /tmp/generated
+            archive:
+              log: {}
+      volumes:
+        - name: generated-code
+          emptyDir: {}
+
+    - name: code-evaluator
+      container:
+        image: fibonacci-agent:latest
+        command: [python, /app/evaluation/evaluator.py]
+        env:
+          - name: KUBERNETES_MODE
+            value: "true"
+          - name: CODE_OUTPUT_DIR
+            value: "/tmp/generated"
+          - name: EXECUTION_TIMEOUT
+            value: "30"
+        resources:
+          limits:
+            memory: 256Mi
+            cpu: 500m
+          requests:
+            memory: 128Mi
+            cpu: 100m
+        volumeMounts:
+          - name: generated-code
+            mountPath: /tmp/generated
+      outputs:
+        artifacts:
+          - name: generated-code
+            path: /tmp/generated
+            archive:
+              log: {}
+      volumes:
+        - name: generated-code
+          emptyDir: {}
+
+    - name: second-agent
+      container:
+        image: fibonacci-agent:latest
+        command: [python, /app/agent/second_agent.py]
+        env:
+          - name: KUBERNETES_MODE
+            value: "true"
+          - name: CODE_OUTPUT_DIR
+            value: "/tmp/generated"
+        resources:
+          limits:
+            memory: 256Mi
+            cpu: 500m
+          requests:
+            memory: 128Mi
+            cpu: 100m
+        volumeMounts:
+          - name: generated-code
+            mountPath: /tmp/generated
+      volumes:
+        - name: generated-code
+          emptyDir: {}

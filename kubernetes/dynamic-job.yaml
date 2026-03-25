@@ -1,0 +1,53 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: dynamic-code-executor
+  namespace: fibonacci-agent
+spec:
+  template:
+    metadata:
+      labels:
+        app: dynamic-executor
+    spec:
+      restartPolicy: OnFailure
+      runtimeClassName: gvisor
+      containers:
+        - name: executor
+          image: fibonacci-agent:latest
+          imagePullPolicy: Never
+          command: ["python", "/app/run_dynamic.py"]
+          env:
+            - name: KUBERNETES_MODE
+              value: "true"
+            - name: CODE_OUTPUT_DIR
+              value: "/tmp/generated"
+            - name: RUNTIME_CLASS
+              value: "gvisor"
+            - name: EXECUTION_TIMEOUT
+              value: "30"
+            - name: MAX_MEMORY
+              value: "128Mi"
+            - name: MAX_CPU
+              value: "500m"
+            - name: TASK
+              value: "reverse a string"
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: openai-secret
+                  key: api-key
+                  optional: true
+          resources:
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+          volumeMounts:
+            - name: generated-code
+              mountPath: /tmp/generated
+      volumes:
+        - name: generated-code
+          persistentVolumeClaim:
+            claimName: generated-code-pvc
